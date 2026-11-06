@@ -1,0 +1,8 @@
+{
+  "rubric": "<rubric name>",
+  "judge_route": "judge",
+  "labelled_cases": 0,
+  "kappa": 0.0,
+  "measured_on": "2026-01-01",
+  "how": "Cohen's kappa between the judge and human labels on the same cases; the labels and run live beside this file."
+}

@@ -1,0 +1,64 @@
+# The model catalogue (01/C5, 04/M1–M2). Loaded strictly at start: an unknown key, provider, model or route, a model
+# without a dated price, a retired model, or a judge on the family it grades stops the app (02/B5).
+#
+# Agent files name a ROUTE, never a model. To switch a kind of call to another model or provider, change its route's
+# `model` here, add the model (and its provider) if it is new, and re-run the evals before merging (04/M2).
+version: 1
+
+providers:
+  anthropic:
+    adapter: anthropic
+    credential_env: ANTHROPIC_API_KEY  # read from the environment at start; no key means AI is off, never a failure
+    refusal_fallback: default  # on a policy decline the provider retries on another model; the served model is recorded
+  gemini:
+    adapter: gemini
+    credential_env: GEMINI_API_KEY  # no key: search runs on its lexical lane only, and says so (01/R5)
+
+models:
+  claude-opus-5-5:
+    provider: anthropic
+    id: claude-opus-5-5
+    family: claude
+    price:
+      # RETRIEVED: the claude-api skill's model table (cached 2026-10-06). Cache rates are DERIVED from the standard
+      # multipliers (read 0.1×, 5-minute write 1.25× of input). Re-check against the provider's pricing page (10/H20).
+      snapshot: anthropic-models-table-2026-10-06
+      input_per_mtok: "4.00"
+      output_per_mtok: "20.00"
+      cache_read_per_mtok: "0.20"
+      cache_write_per_mtok: "5.00"
+  claude-haiku-5-5:
+    provider: anthropic
+    id: claude-haiku-5-5
+    family: claude
+    price:
+      # RETRIEVED as above, for prompts up to 100K tokens (longer prompts cost more: keep them under it or add a row).
+      snapshot: anthropic-models-table-2026-10-06
+      input_per_mtok: "0.10"
+      output_per_mtok: "0.50"
+      cache_read_per_mtok: "0.01"
+      cache_write_per_mtok: "0.125"
+
+routes:
+  default: {model: claude-opus-5-5, effort: medium, max_output_tokens: 4000, timeout_seconds: 90}
+  deep: {model: claude-opus-5-5, effort: high, max_output_tokens: 16000, timeout_seconds: 300}
+  # A step moves to `fast` only after an eval shows it holds there (04/M1, "measure before downsizing").
+  fast: {model: claude-haiku-5-5, effort: low, max_output_tokens: 2000, timeout_seconds: 30}
+  # judge: an LLM judge must use another model family from the routes it grades, and can gate nothing until it is
+  # calibrated (06/E5, EL3). Add it with a second provider.
+
+# Embeddings by use (04/X4). The model and its size together are the embedding space every stored vector records;
+# changing either is a re-index into a new space, never a mix. The `rag.chunks.embedding` column has this size.
+embeddings:
+  default:
+    provider: gemini
+    id: gemini-embedding-001
+    dimensions: 768  # of its 3072; smaller sizes come back unnormalised, so the adapter normalises them
+    max_input_tokens: 2048
+    price:
+      # RETRIEVED: Google's Gemini API pricing page, standard tier (2026-11-05). Re-check before relying on it (10/H20).
+      snapshot: gemini-api-pricing-2026-11-05
+      input_per_mtok: "0.15"
+
+limits:
+  tenant_daily_usd: "5.00"  # per tenant per UTC day; over it, AI calls are refused with 429 (01/R2, 07/O19)

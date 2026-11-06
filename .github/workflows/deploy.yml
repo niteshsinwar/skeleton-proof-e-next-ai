@@ -1,0 +1,159 @@
+# Deploy (11 §4, 07/O1-O6). A release tag or a manual run deploys exactly that commit: CI's gate must be green on it
+# (07/O4); its images are built ONCE and pushed to GHCR by digest; that digest is what every environment runs
+# (07/O1, never a rebuild, never a working tree). The target is a Docker host running Compose (plans/b5 D1), reached
+# with Docker over SSH; scripts/deploy.py does every step, the same as `make deploy` at a terminal.
+# Staging first, then production behind its GitHub environment's required reviewer (a deploy is a human decision,
+# 07/O3): go-live preconditions, migrate, deploy, smoke, and an automatic revert to the previous digest when smoke
+# fails (07/O6; on one Compose host a revert, not a traffic split).
+# Each environment holds its own secrets, readable only once its protection rules pass: DEPLOY_ENV_FILE (the host
+# env file's content, ops/deploy/compose-host/host.env.example), DEPLOY_SSH_KEY and DEPLOY_KNOWN_HOSTS, and the
+# variable DEPLOY_DOCKER_HOST (ssh://user@host). No cloud key is stored: a cloud target uses OIDC (ops/deploy/README.md).
+# Every action is pinned to a full commit SHA from a release at least 7 days old (13/V5, V4).
+name: deploy
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      first-release:
+        description: "Production's very first go-live: nothing runs yet to roll back to (07/O4)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# One deploy at a time, and never cancelled half way.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: CI's gate passed on this exact commit (07/O4)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: python3 -I scripts/deploy.py ci-status --sha "$SHA"
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The only job that may write packages: it pushes this commit's images once.
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      api: ${{ steps.publish.outputs.api }}
+      web: ${{ steps.publish.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build once, push by digest (07/O1)
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          make publish REGISTRY="ghcr.io/${OWNER,,}" ARGS="--github-output $GITHUB_OUTPUT"
+
+  staging:
+    needs: [publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: staging
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reach the staging host; the env file comes from the environment's secret, never from git
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077 && printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts)
+          printf 'Host *\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' > ~/.ssh/config
+          (umask 077 && printf '%s\n' "$ENV_FILE" > "$RUNNER_TEMP/deploy.env")
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Migrate, deploy, smoke; a failed smoke reverts to the previous digest (07/O2, O6)
+        env:
+          DOCKER_HOST: ${{ vars.DEPLOY_DOCKER_HOST }}
+          GH_TOKEN: ${{ github.token }}
+          API_IMAGE: ${{ needs.publish.outputs.api }}
+          WEB_IMAGE: ${{ needs.publish.outputs.web }}
+        run: |
+          python3 -I scripts/deploy.py deploy --env staging --env-file "$RUNNER_TEMP/deploy.env" \
+            --api-image "$API_IMAGE" --web-image "$WEB_IMAGE" > "$RUNNER_TEMP/record.json"
+      - name: Record the SHA, migration revision, who and when (07/O3); /release copies it into docs/STATE.md
+        if: always()
+        run: |
+          { echo "### staging"; echo '```json'; cat "$RUNNER_TEMP/record.json" 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$RUNNER_TEMP/deploy.env" ~/.ssh/deploy_key
+
+  production:
+    needs: [publish, staging]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Waits for the environment's required reviewer; go-live refuses if the environment has none (07/O3, O4).
+    environment: production
+    permissions:
+      contents: read
+      packages: read
+      checks: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Reach the production host; the env file comes from the environment's secret, never from git
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          ENV_FILE: ${{ secrets.DEPLOY_ENV_FILE }}
+          GH_TOKEN: ${{ github.token }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          install -d -m 700 ~/.ssh
+          (umask 077 && printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts)
+          printf 'Host *\n  IdentityFile ~/.ssh/deploy_key\n  IdentitiesOnly yes\n' > ~/.ssh/config
+          (umask 077 && printf '%s\n' "$ENV_FILE" > "$RUNNER_TEMP/deploy.env")
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+      - name: Go-live checks, migrate, deploy, smoke; a failed smoke reverts to the previous digest (07/O2, O6)
+        env:
+          DOCKER_HOST: ${{ vars.DEPLOY_DOCKER_HOST }}
+          GH_TOKEN: ${{ github.token }}
+          API_IMAGE: ${{ needs.publish.outputs.api }}
+          WEB_IMAGE: ${{ needs.publish.outputs.web }}
+          FIRST_RELEASE: ${{ inputs.first-release && 'yes' || '' }}
+        run: |
+          python3 -I scripts/deploy.py deploy --env production --env-file "$RUNNER_TEMP/deploy.env" \
+            --api-image "$API_IMAGE" --web-image "$WEB_IMAGE" ${FIRST_RELEASE:+--first-release} > "$RUNNER_TEMP/record.json"
+      - name: Record the SHA, migration revision, who and when (07/O3); /release copies it into docs/STATE.md
+        if: always()
+        run: |
+          { echo "### production"; echo '```json'; cat "$RUNNER_TEMP/record.json" 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          rm -f "$RUNNER_TEMP/deploy.env" ~/.ssh/deploy_key

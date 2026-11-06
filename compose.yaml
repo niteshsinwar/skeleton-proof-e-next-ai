@@ -1,0 +1,20 @@
+# Local services only (12/N2: a service appears here only when code uses it, 01/R10).
+# Postgres 18 as in production (02/D1), with pgvector for retrieval (04/X4).
+services:
+  postgres:
+    # Pinned by digest, each at least 7 days old when pinned (13/V3, V4); Renovate moves them.
+    image: pgvector/pgvector:0.8.6-pg18-trixie@sha256:78bf48b801e792f99e3ac62b5036fd3876e9be48afda16c1e331af1c75ceb2ff
+    environment:
+      POSTGRES_USER: app_owner
+      POSTGRES_PASSWORD: local-only-not-a-secret
+      POSTGRES_DB: app
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_owner -d app"]
+      interval: 5s
+      retries: 10
+volumes:
+  pgdata:

@@ -1,0 +1,141 @@
+# Faults on critical paths, each caught by a named test with an expected failure message (06/T7, 06/EL4).
+# `make mutation` runs them; `make check` runs them at tier E. Add one with every new guard: decisions, money,
+# permissions and verdicts. An entry whose `find` no longer matches fails the run, so this list can't go stale quietly.
+
+[[mutation]]
+name = "the submitter decides their own work item"
+file = "apps/api/src/skeleton_proof_e_next_ai/domain/work_items.py"
+find = "if actor == self.submitted_by:"
+replace = "if False:"
+test = "tests/unit/test_domain.py::test_submitter_cannot_decide_their_own_item"
+expect = "DID NOT RAISE"
+
+[[mutation]]
+name = "another person's work item is visible (BOLA)"
+file = "apps/api/src/skeleton_proof_e_next_ai/application/work_items.py"
+find = "or (item.created_by != _owner(principal) and not principal.can(Capability.WORK_ITEM_READ_ALL))"
+replace = "or False"
+test = "tests/integration/test_api.py::test_bola_another_users_item_is_404_with_the_same_body"
+expect = "assert 200 == 404"
+lane = "integration"
+
+[[mutation]]
+name = "a write without If-Match is accepted"
+file = "apps/api/src/skeleton_proof_e_next_ai/api/deps.py"
+find = "if if_match is None:"
+replace = "if False:"
+test = "tests/integration/test_api.py::test_submit_and_approve_need_if_match_and_respect_separation_of_duties"
+expect = "428"
+lane = "integration"
+
+# Not listed, because removing either alone changes nothing a test can see (defence in depth, found by this check):
+# the tenant check in work_items._visible (row-level security already hides other tenants' rows) and the use case's
+# version check (the repository's versioned UPDATE refuses the stale write anyway).
+
+[[mutation]]
+name = "a citation is not checked against what the model was shown"
+file = "apps/api/src/skeleton_proof_e_next_ai/intelligence/validation.py"
+find = "            if shown is None:\n                return \"citation_unknown_source\""
+replace = "            if False:\n                return \"citation_unknown_source\""
+test = "tests/unit/test_ai_steps.py::test_citations_must_quote_the_block_they_name_verbatim"
+expect = "citation_unknown_source"
+
+[[mutation]]
+name = "an abstention is read as an answer"
+file = "apps/api/src/skeleton_proof_e_next_ai/intelligence/steps.py"
+find = "if output.abstain is not None:"
+replace = "if False:"
+test = "tests/unit/test_ai_steps.py::test_an_abstention_is_recorded_as_itself_even_beside_content"
+expect = "abstained"
+
+[[mutation]]
+name = "another tenant's text reaches the model"
+file = "apps/api/src/skeleton_proof_e_next_ai/intelligence/ledger.py"
+find = "if item.tenant_id != tenant_id:"
+replace = "if False:"
+test = "tests/unit/test_ai_steps.py::test_another_tenants_text_never_reaches_the_prompt"
+expect = "payroll"
+
+[[mutation]]
+name = "a proposal is decided by the person it is for"
+file = "apps/api/src/skeleton_proof_e_next_ai/domain/ai.py"
+find = "if by in (self.proposed_by, self.on_behalf_of):"
+replace = "if False:"
+test = "tests/unit/test_ai_agency.py::test_neither_the_proposer_nor_the_person_it_is_for_may_decide_it"
+expect = "DID NOT RAISE"
+
+[[mutation]]
+name = "late output from a superseded run is not fenced"
+file = "apps/api/src/skeleton_proof_e_next_ai/persistence/ai_records.py"
+find = "        await self.conn.execute(select(func.pg_advisory_xact_lock(func.hashtextextended(subject, 0))))\n"
+replace = ""
+test = "tests/integration/test_ai_records.py::test_a_late_run_sees_the_newer_one_even_when_they_finish_together"
+expect = "there is no fence"
+lane = "integration"
+
+[[mutation]]
+name = "a use case scans model prose with a regular expression"
+file = "apps/api/src/skeleton_proof_e_next_ai/application/ai_runs.py"
+find = "from __future__ import annotations\n"
+replace = "from __future__ import annotations\n\nimport re  # noqa: F401\n"
+test = "tests/invariants/test_structure.py::test_no_decision_is_read_out_of_model_prose"
+expect = "use regular expressions without a reason"
+
+[[mutation]]
+name = "a judge's verdict is taken in one order only"
+file = "evals/harness/graders.py"
+find = "    if _SWAPPED[two] != one:"
+replace = "    if False:"
+test = "../../evals/harness/tests/test_selftest.py::test_a_judge_sees_both_orders_and_position_bias_counts_for_neither"
+expect = "'inconsistent'"
+
+[[mutation]]
+name = "search ranks chunks the caller's roles may not see"
+file = "apps/api/src/skeleton_proof_e_next_ai/persistence/documents.py"
+find = "func.cardinality(chunks.c.allowed_roles) == 0, chunks.c.allowed_roles.overlap(sorted(scope.roles))"
+replace = "func.cardinality(chunks.c.allowed_roles) >= 0"
+test = "tests/integration/test_retrieval_api.py::test_restricted_documents_are_never_candidates_for_other_roles"
+expect = "'Pay'"
+lane = "integration"
+
+[[mutation]]
+name = "vectors from another embedding space are compared"
+file = "apps/api/src/skeleton_proof_e_next_ai/persistence/documents.py"
+find = ".where(_visible(scope), chunks.c.embedding_space == space)"
+replace = ".where(_visible(scope))"
+test = "tests/integration/test_retrieval_api.py::test_vectors_from_another_space_are_never_compared"
+expect = "'vector'"
+lane = "integration"
+
+[[mutation]]
+name = "retrieved text enters a prompt as trusted"
+file = "apps/api/src/skeleton_proof_e_next_ai/domain/retrieval.py"
+find = "trust=Trust.EXTERNAL,"
+replace = "trust=Trust.RECORD,"
+test = "tests/unit/test_retrieval.py::test_a_hit_enters_a_prompt_as_untrusted_data"
+expect = "Trust.RECORD"
+
+[[mutation]]
+name = "an outside tool changed upstream is still called"
+file = "apps/api/src/skeleton_proof_e_next_ai/intelligence/mcp.py"
+find = "if live is None or _fingerprint(live) != tool.fingerprint:"
+replace = "if live is None:"
+test = "tests/unit/test_outside_tools.py::test_a_tool_changed_upstream_is_refused_until_reviewed"
+expect = "send the user's files"
+
+[[mutation]]
+name = "an outside write runs without a person"
+file = "apps/api/src/skeleton_proof_e_next_ai/application/outside_tools.py"
+find = "if tool.kind is ToolKind.PROPOSE:"
+replace = "if False:"
+test = "tests/unit/test_outside_tools.py::test_a_read_runs_with_the_tenants_credentials_and_a_write_only_proposes"
+expect = "proposal_id"
+
+[[mutation]]
+name = "the MCP endpoint accepts the API's tokens"
+file = "apps/api/src/skeleton_proof_e_next_ai/api/app.py"
+find = "            settings.mcp_audience,"
+replace = "            settings.auth_audience,"
+test = "tests/integration/test_mcp_server.py::test_tokens_are_bound_to_their_audience_both_ways"
+expect = "401"
+lane = "integration"

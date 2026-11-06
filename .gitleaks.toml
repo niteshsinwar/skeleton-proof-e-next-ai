@@ -1,0 +1,14 @@
+# Secret scanning (05/SG12, SG13): gitleaks' own rules, everywhere: ai/ (prompts, tool descriptions, MCP config) and
+# evals/ (datasets) included, so a credential in a prompt or a dataset fails the gate (05 §5). Only folders that are
+# gitignored and never committed are skipped when the working tree is scanned outside git; inside git, `gitleaks git`
+# reads the history, where they never are.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "local-only folders that git ignores (12/N10)"
+paths = [
+  '''(^|/)(node_modules|\.venv|\.next|dist|\.tools|\.mypy_cache|\.ruff_cache|\.pytest_cache|\.hypothesis|test-results|playwright-report)/''',
+  '''(^|/)\.dev-keys/''',
+  '''(^|/)\.e2e-state/''',
+]

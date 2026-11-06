@@ -1,0 +1,20 @@
+# Changes here will be overwritten by Copier
+_commit: 1e9a63e
+_src_path: /Users/niteshsinwar/Desktop/Projects/engineering-baseline/skeleton
+ai: true
+ai_retrieval: true
+description: 'TODO: one sentence on the user and the job (fill in during /discover)'
+error_tracker: sentry
+external_systems: false
+login: oidc
+mcp_client: true
+mcp_server: true
+package_name: skeleton_proof_e_next_ai
+project_name: skeleton proof e next ai
+project_slug: skeleton-proof-e-next-ai
+schedules: false
+tenancy: multi
+tier: E
+ui: next
+uploads: true
+webhooks_in: true

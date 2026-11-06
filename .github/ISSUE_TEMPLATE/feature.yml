@@ -1,0 +1,37 @@
+name: New requirement
+description: New or changed behaviour (not a defect, 06/T9)
+labels: [requirement]
+body:
+  - type: input
+    id: user
+    attributes:
+      label: Who is the user?
+    validations:
+      required: true
+  - type: textarea
+    id: job
+    attributes:
+      label: What job are they doing, and what happens today?
+    validations:
+      required: true
+  - type: input
+    id: metric
+    attributes:
+      label: What number says it worked?
+      description: A measurable outcome, not a feeling (11 §6 P0).
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria (Given / When / Then)
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority (MoSCoW)
+      options: [Must, Should, Could, "Won't (this time)"]
+  - type: textarea
+    id: open
+    attributes:
+      label: What is still OPEN?
+      description: Unanswered questions block load-bearing work until answered (10/H6).

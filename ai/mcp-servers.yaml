@@ -1,0 +1,27 @@
+# Outside MCP servers this product's agents may use (04/K3, 05/SG5). Loaded strictly at start (02/B5): anything not
+# listed here is unreachable. Each tool is the reviewed copy of what the server says: its description and input
+# schema. On every call the live tool must match it exactly, or the call is refused (`tool_changed_upstream`), so a
+# server can't change what a tool does without a person reviewing it. `POST /ai/mcp/servers/{server}/review` lists
+# every difference; copy a change here only after reading it, in a reviewed commit.
+#
+# kind: read     runs, and its result returns to the model as untrusted text
+# kind: propose  never runs on the model's say-so: it becomes a proposal a person approves (04/K1)
+#
+# Each tenant connects a server with its own OAuth client (client_credentials), sealed at rest with
+# APP_MCP_SECRETS_KEY; access tokens live in memory only. `auth: none` is for servers that need no credential.
+version: 1
+servers: {}
+# servers:
+#   tickets:
+#     url: https://mcp.tickets.example/mcp
+#     issuer: https://auth.tickets.example   # the authorization server its clients belong to
+#     scope: tickets.read tickets.write
+#     tools:
+#       find_ticket:
+#         kind: read
+#         description: Find tickets by words in their title.
+#         input_schema: {type: object, properties: {query: {type: string}}, required: [query]}
+#       open_ticket:
+#         kind: propose
+#         description: Open a ticket.
+#         input_schema: {type: object, properties: {title: {type: string}}, required: [title]}

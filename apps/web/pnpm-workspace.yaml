@@ -1,0 +1,28 @@
+# pnpm 11 settings (13/V4, W56, W76). pnpm 11 reads settings only from this file, never from package.json or .npmrc.
+# Resolve only versions published at least 7 days ago, the same window as uv and Renovate; with no such version the
+# install fails rather than falling back to a newer one (fail closed, README #6).
+minimumReleaseAge: 10080
+minimumReleaseAgeStrict: true
+# A dependency may not pull a sub-dependency from a git URL or tarball (the pnpm 11 default, stated so it stays on).
+blockExoticSubdeps: true
+# No dependency runs an install script unless it is listed in allowBuilds with a reason; an unlisted one fails the
+# install (strictDepBuilds, the pnpm 11 default).
+strictDepBuilds: true
+# The Node version in package.json `engines` is enforced, not advisory: the wrong Node fails the install (03/F25, 13/V3).
+engineStrict: true
+allowBuilds:
+  # eslint-config-next's resolver: its script only fetches a native binding when the prebuilt optional dependency is
+  # missing, and the prebuilt one installs on every platform we run (checked with pnpm 11, Node 26). Denied, not run.
+  unrs-resolver: false
+  # Sentry's CLI (sends source maps to Sentry at build time): its binary comes from the prebuilt @sentry/cli-<platform>
+  # optional dependency; the script only fetches one from Sentry's CDN, outside the lockfile, when that is missing. Denied.
+  "@sentry/cli": false
+# Known vulnerabilities fixed by an override until the parent ships the fix (07/O21; osv-scanner in `make deps`). Each line
+# names the advisory; remove it once the parent depends on a fixed version (Renovate's PR will show it).
+overrides:
+  # GHSA-g3hv-75wg-m249 (minimatch, DoS through glob amplification, fixed in 11.0.1; 10.x has no fix). Reached only
+  # through the type-aware lint toolchain, with our own globs as input.
+  "@typescript-eslint/typescript-estree>minimatch": "11.0.3"
+  # GHSA-3g3m-2fjr-6pw4 (glob, an aborted walk keeps reading directories, fixed in 14.0.2) and, through it, the minimatch
+  # advisory above: reached only through Sentry's build plugins, which call the high-level glob() that 14 keeps (W86).
+  "@sentry/bundler-plugins>glob": "14.0.3"

@@ -1,0 +1,9 @@
+# Business configuration: versioned, effective-dated data owned by the business (02/B5, 02/D9).
+# Read by a strict loader that rejects unknown keys. Never edit a version that records have used;
+# add a new [[work_items]] entry with a later effective_from instead.
+
+# EXAMPLE SLICE
+[[work_items]]
+version = 1
+effective_from = 2026-01-01
+max_title_length = 200

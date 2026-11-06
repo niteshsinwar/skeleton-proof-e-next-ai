@@ -1,0 +1,27 @@
+# The work-items journey: people create, list, read and decide work items (the skeleton's example slice; replace it
+# with your product's journeys, few and user-facing, 07/O13). Loaded strictly by scripts/slo.py; `make slo` checks it.
+journey: work-items
+title: Work items
+# A starter until measured (01/R1): the targets come from 07/OL2, not from this product's own traffic. When load tests
+# and production have measured it, set `starter: false` and `measured: YYYY-MM-DD` and revisit every number.
+starter: true
+window_days: 30
+routes:
+  - GET /work-items
+  - POST /work-items
+  - GET /work-items/{item_id}
+  - POST /work-items/{item_id}/submit
+  - POST /work-items/{item_id}/approve
+  - POST /work-items/{item_id}/reject
+objectives:
+  # "System down": the share of requests answered without a 5xx (07/OL2: 99.9% at tier E).
+  availability:
+    target: 99.9
+    owner: "@OWNER"
+    runbook: ops/runbooks/incident.md#1-triage
+  # p95 under the threshold: 95% of requests faster than it (a starter from docs/architecture/capacity.md, 01/R1).
+  latency:
+    target: 95
+    threshold_ms: 500
+    owner: "@OWNER"
+    runbook: ops/runbooks/incident.md#1-triage

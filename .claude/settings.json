@@ -1,0 +1,96 @@
+{
+  "env": {
+    "HARNESS_TIER": "E"
+  },
+  "enableAllProjectMcpServers": false,
+  "permissions": {
+    "allow": [
+      "Bash(make check)",
+      "Bash(make test)",
+      "Bash(make eval)",
+      "Bash(make status)",
+      "Bash(make harness-check)",
+      "Bash(make harness-test)",
+      "Bash(make test-db)",
+      "Bash(make lint)",
+      "Bash(make types)",
+      "Bash(make contracts)",
+      "Bash(make test-e2e)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Read(*.pem)",
+      "Read(*.key)",
+      "Read(*.p12)",
+      "Read(*.pfx)",
+      "Read(secrets/**)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git reset --hard *)",
+      "Bash(git add -A)",
+      "Bash(git add -A *)",
+      "Bash(git add --all *)",
+      "Bash(git add .)",
+      "Bash(git clean *)",
+      "Bash(git commit --no-verify *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_start.py\"", "timeout": 30 }]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_compact.py\"", "timeout": 30 }]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/drift_watch.py\"", "timeout": 10 }]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|MultiEdit|NotebookEdit|Bash|Grep|Glob",
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/protect.py\"", "timeout": 30 }]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post_edit.py\"", "timeout": 30 }]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/tool_failure.py\"", "timeout": 10 }]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre_compact.py\"", "timeout": 30 }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/stop_gate.py\"", "timeout": 600 }]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [{ "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/session_end.py\"", "timeout": 30 }]
+      }
+    ]
+  }
+}

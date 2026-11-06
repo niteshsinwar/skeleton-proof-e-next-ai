@@ -1,0 +1,85 @@
+[project]
+name = "skeleton-proof-e-next-ai-api"
+version = "0.1.0"
+description = "skeleton proof e next ai: backend API"
+requires-python = ">=3.14"
+# Exact pins (13/V3); updates arrive through Renovate after the 7-day cooldown (13/V4).
+dependencies = [
+  "fastapi==0.162.0",
+  "uvicorn==0.54.0",
+  "pydantic==2.14.1",
+  "pydantic-settings==2.16.1",
+  "sqlalchemy[asyncio]==2.1.6",
+  "psycopg[binary]==3.3.6",
+  "alembic==1.20.1",
+  "pyjwt[crypto]==2.15.1",
+  "httpx==0.28.1",
+  # Traces and metrics (07/O8-O9, 13/SK7; plans/b5 D4): the SDK and the OTLP/HTTP exporter only. Request spans,
+  # RED metrics and the gen_ai mapping are our own small code (telemetry/otel.py), not contrib instrumentations.
+  "opentelemetry-api==1.45.2",
+  "opentelemetry-sdk==1.45.2",
+  "opentelemetry-exporter-otlp-proto-http==1.45.2",
+  # The product AI (plans/b4): the provider's official SDK behind our port (13/V7), and the agent-file parser.
+  "anthropic==2.3.0",
+  "pyyaml==6.0.3",
+  # Durable, resumable human-in-the-loop workflows, wired in every AI project (13/SK5).
+  "langgraph==1.2.18",
+  "langgraph-checkpoint-postgres==3.2.0",
+  # Retrieval (04/X4): Gemini embeddings through Google's official SDK, and pgvector's SQLAlchemy type.
+  "google-genai==2.33.0",
+  "pgvector==0.5.1",
+  # MCP (04/K3): the official Python SDK; its HTTP client, and JSON Schema to check outside tools' arguments.
+  "mcp==2.3.0",
+  "httpx2==2.16.0",
+  "jsonschema==4.26.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==9.2.0",
+  "hypothesis==6.170.12",
+  "ruff==0.17.3",
+  "mypy==2.4.0",
+  "types-pyyaml==6.0.12.20260906",
+]
+
+[tool.uv]
+# The source tree runs from src/ directly; no build backend is needed.
+package = false
+# Release-age cooldown (13/V4): resolve only versions at least 7 days old, a rolling window recorded in uv.lock and
+# moved only when the lock is re-resolved. Renovate waits the same 7 days, so its PRs always lock (uv's Renovate guide).
+exclude-newer = "7 days"
+# Durations need uv 0.13 or later; an older uv would refuse the setting, so it is told to upgrade instead (13/V3).
+required-version = ">=0.13.6"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "integration: needs a real Postgres (TEST_DATABASE_URL); REQUIRE_DB=1 turns a missing database into an error",
+  "covers(route): the route this test proves, as 'METHOD /path' (02/A11)",
+]
+
+[tool.ruff]
+line-length = 120
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+# ASYNC: no blocking calls on the event loop (13/SK2). S: security lints. BLE: no blind except (02/B7).
+select = ["E", "F", "W", "I", "B", "UP", "S", "ASYNC", "BLE", "RUF", "PL"]
+# PLR0913/0917: use-case signatures name their ports explicitly. RUF001-003: en dashes are the house style
+# for rule ranges (e.g. 02/A1–A5).
+ignore = ["PLR0913", "PLR0917", "PLR2004", "RUF001", "RUF002", "RUF003"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "S105", "S106", "PLR0915"]
+# The root system lanes (12/N5) are linted with this configuration too: `make lint` passes ../../tests.
+"../../tests/**" = ["S101", "S105", "S106", "PLR0915"]
+"src/*/persistence/migrations/**" = ["E501"]
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+files = ["src"]
+plugins = ["pydantic.mypy"]

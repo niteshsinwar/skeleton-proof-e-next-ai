@@ -1,0 +1,37 @@
+name: Defect
+description: Something does not do what was agreed (a defect, not a new requirement, 06/T9)
+labels: [defect]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Defect or new requirement?
+      description: A defect breaks agreed behaviour; asking for different behaviour is a new requirement (use that form).
+      options:
+        - Defect: it breaks agreed behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened, and what was expected
+      description: Steps to reproduce; the correlation id from the error, if there was one (never personal data).
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity (impact)
+      options: [Critical, High, Medium, Low]
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority (when to fix; set by the owner, separately from severity)
+      options: [Now, Next, Later]
+  - type: textarea
+    id: test
+    attributes:
+      label: The test that would have caught it
+      description: Every fix ships with it (06/T9, README #11).

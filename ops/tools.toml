@@ -1,0 +1,45 @@
+# The pinned tools every gate uses, the same on a laptop and in CI (13/V3, V4, SK8). `make tools` installs them into
+# .tools/ (gitignored), verifying each download against the sha256 written here; a mismatch or a missing checksum
+# stops the install. Python tools run through `uvx` at the pinned version under the uv cooldown instead.
+# Each release was at least 7 days old when pinned (2026-11-05); Renovate proposes updates after the same window.
+
+[binary.gitleaks]
+version = "8.30.1"
+url = "https://github.com/gitleaks/gitleaks/releases/download/v{version}/gitleaks_{version}_{platform}.tar.gz"
+platforms = { darwin-arm64 = "darwin_arm64", linux-x64 = "linux_x64" }
+sha256 = { darwin-arm64 = "b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5", linux-x64 = "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb" }
+
+[binary.osv-scanner]
+version = "2.7.0"
+url = "https://github.com/google/osv-scanner/releases/download/v{version}/osv-scanner_{platform}"
+platforms = { darwin-arm64 = "darwin_arm64", linux-x64 = "linux_amd64" }
+sha256 = { darwin-arm64 = "d4926ef8da134332543be276dff157e4c170f99ad91fc48e89448a8816bdf70b", linux-x64 = "160c6253e2922e9e0a6a9771c5c4c40a4b3c6090b34a3cdd5e80c96cc2e4218b" }
+
+[binary.syft]
+version = "1.55.0"
+url = "https://github.com/anchore/syft/releases/download/v{version}/syft_{version}_{platform}.tar.gz"
+platforms = { darwin-arm64 = "darwin_arm64", linux-x64 = "linux_amd64" }
+sha256 = { darwin-arm64 = "1217c258bd5eb91ef3189cf22a82e02f9cac07e4ce934350f428e93aff674625", linux-x64 = "bb65249542db5fedeeb4d3f9b018b75e7264dbfbbb10486f044581a92f90490d" }
+
+[binary.grype]
+version = "0.121.0"
+url = "https://github.com/anchore/grype/releases/download/v{version}/grype_{version}_{platform}.tar.gz"
+platforms = { darwin-arm64 = "darwin_arm64", linux-x64 = "linux_amd64" }
+sha256 = { darwin-arm64 = "7be39d3a0428c664ce0183e4aba31ed9accffce9eda7e7f6fa84e9c512285f27", linux-x64 = "64e07133d3486115de647a66581461dccf5c732748a0a3119077395565f15519" }
+
+[binary.k6]
+version = "1.8.2"
+url = "https://github.com/grafana/k6/releases/download/v{version}/k6-v{version}-{platform}"
+platforms = { darwin-arm64 = "macos-arm64.zip", linux-x64 = "linux-amd64.tar.gz" }
+sha256 = { darwin-arm64 = "2ce3ed837e9a7c7b1b7a594ff72861bbf9d94d5930ca6611bd6f1ef5a08f7d0a", linux-x64 = "37620781d35406ebf402397a6c5cf4adb62d175cb052ff45325ae0b860527063" }
+
+# The API contract's breaking-change check (02/A10, `make api-diff`); 1.35.0 published 2026-10-28.
+[binary.oasdiff]
+version = "1.35.0"
+url = "https://github.com/oasdiff/oasdiff/releases/download/v{version}/oasdiff_{version}_{platform}.tar.gz"
+platforms = { darwin-arm64 = "darwin_all", linux-x64 = "linux_amd64" }
+sha256 = { darwin-arm64 = "964ad2c0331768c4515fc49779827094bc89a65b1d309dac28886d1c3faf305c", linux-x64 = "a8023002fcb2eaa7f5758148a9303cb63d33b939886df312268bc0fc7b939140" }
+
+[python]
+zizmor = "1.31.1"
+semgrep = "1.182.1"

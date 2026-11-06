@@ -1,0 +1,10 @@
+# The eval suite uses the backend's rules (02/B10), with the same allowances its tests have.
+extend = "../apps/api/pyproject.toml"
+
+[lint.per-file-ignores]
+"**/test_*.py" = ["S101", "PLR0915"]
+"test_datasets.py" = ["S603", "S607"]  # `git rev-parse` from PATH names the commit a recorded run came from
+
+[lint.isort]
+# The harness is the eval suite's own package: it sorts after the app's, whatever the app is called.
+known-local-folder = ["harness"]

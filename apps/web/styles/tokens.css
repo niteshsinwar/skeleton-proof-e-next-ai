@@ -1,0 +1,47 @@
+/*
+ * The only place design values live (03/F11–F13). Components use these tokens, never literal values.
+ * Identity colour (accent) and judgement colours (ok, caution, bad) are separate scales that never touch (03/F12).
+ * Themes switch by data-theme on <html>, set by the server before first paint.
+ */
+:root,
+[data-theme="light"] {
+  --color-canvas: oklch(0.985 0.002 250);
+  --color-surface: oklch(1 0 0);
+  --color-ink: oklch(0.24 0.02 260);
+  --color-ink-muted: oklch(0.45 0.02 260);
+  --color-line: oklch(0.89 0.01 260);
+  --color-accent: oklch(0.47 0.16 265);
+  --color-accent-ink: oklch(0.99 0 0);
+  --color-ok: oklch(0.45 0.12 150);
+  --color-caution: oklch(0.5 0.12 75);
+  --color-bad: oklch(0.5 0.18 25);
+  --color-focus: oklch(0.55 0.2 265);
+}
+
+[data-theme="dark"] {
+  --color-canvas: oklch(0.18 0.01 260);
+  --color-surface: oklch(0.22 0.012 260);
+  --color-ink: oklch(0.95 0.005 260);
+  --color-ink-muted: oklch(0.75 0.01 260);
+  --color-line: oklch(0.35 0.015 260);
+  --color-accent: oklch(0.72 0.13 265);
+  --color-accent-ink: oklch(0.16 0.01 260);
+  --color-ok: oklch(0.78 0.12 150);
+  --color-caution: oklch(0.82 0.12 85);
+  --color-bad: oklch(0.75 0.15 25);
+  --color-focus: oklch(0.78 0.14 265);
+}
+
+:root {
+  /* Closed scales: few sizes, one radius, one shadow (03/F13, F42). */
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --leading-body: 1.5;
+  --radius: 0.5rem;
+  --shadow: 0 1px 2px oklch(0 0 0 / 0.08);
+  --measure: 66ch;
+  --motion: 120ms ease-out;
+}

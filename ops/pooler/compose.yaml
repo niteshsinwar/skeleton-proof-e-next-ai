@@ -1,0 +1,19 @@
+# PgBouncer in transaction mode in front of the compose Postgres, used only by `make test-pooler` (the CI pooler job,
+# 01/R7). Not part of the local stack: a project adds a pooler when it measures the need (01/R10, plans/b5 D8).
+# Used as an overlay: docker compose -f compose.yaml -f ops/pooler/compose.yaml (paths resolve from the project root).
+services:
+  pgbouncer:
+    # Pinned by digest, at least 7 days old when pinned (13/V3, V4); Renovate moves it. PgBouncer 1.26.1.
+    image: edoburu/pgbouncer:v1.26.1-p0@sha256:488422e38cff912895d0d65d8963fcd306e6ac589a724398b6eb8e294e94d624
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:6432:6432"
+    volumes:
+      - ./ops/pooler/pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./ops/pooler/userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -d app"]
+      interval: 2s
+      retries: 15

@@ -1,0 +1,194 @@
+# CI (11 §4). Each job runs the same `make` targets a person or Claude runs (10/L2), so a red gate reproduces locally.
+# `gate` is the one required check (11/GL3): a job the change classifier skipped counts as passed; one that failed or
+# was cancelled fails the gate (W21). Actions are pinned to full commit SHAs from releases at least 7 days old
+# (13/V5, V4); Renovate moves them. The token is read-only unless a job asks for more; no cloud keys live here.
+name: ci
+
+on:
+  pull_request:
+  merge_group:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  HARNESS_TIER: "E"
+  REQUIRE_DB: "1"
+  TEST_DATABASE_URL: postgresql+psycopg://app_owner:local-only-not-a-secret@127.0.0.1:5432/ci_test
+  REQUIRE_E2E: "1"
+  E2E_DATABASE_URL: postgresql+psycopg://app_owner:local-only-not-a-secret@127.0.0.1:5432/ci_e2e
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: classify
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: python3 -I scripts/ci_changes.py --event "$EVENT" --base "$BASE" >> "$GITHUB_OUTPUT"
+
+  governance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make harness-check harness-test workflow-check status
+
+  backend:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      # The same Postgres image as the local stack, from compose.yaml: one home for the pin (12/N1).
+      - run: make db-up && make ci-databases
+      - run: make setup-api lint-api types-api test-api test-db
+      - run: make mutation
+
+  frontend:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: apps/web/.nvmrc
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: apps/web/package.json
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      - run: make db-up && make ci-databases
+      - run: make setup-api setup-web lint-web types-web test-web test-e2e
+
+  evals:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      # The harness proves its own verdicts offline; a live model never runs in CI (nightly, opt-in, 06/E4).
+      - run: make setup-api eval-selftest
+
+  contract:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the snapshot at the base commit is read from git history
+          persist-credentials: false
+      # The committed OpenAPI snapshot against the base: a breaking change fails unless the old route was retired
+      # and its sunset has passed (02/A10). A pull request compares with its base, a merge group with its base, a push
+      # with the commit before it, a manual run with main.
+      - env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha || github.event.before || 'origin/main' }}
+        run: make tools api-diff BASE="$BASE"
+
+  security:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      # Pinned binaries, each checked against its sha256 (ops/tools.toml); secrets across the whole git history.
+      - run: make tools security
+
+  images:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      - run: make setup-api tools
+      # Build once, test the built image, then describe and scan that same image (07/O1, 05/SG13).
+      - run: make image test-image sbom scan-image
+        env:
+          REQUIRE_DOCKER: "1"
+      # The rollback rehearsal and the restore drill, through the same deploy code as production (07/O5, O20).
+      - run: make rehearse-rollback restore-drill
+
+  pooler:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      # PgBouncer >= 1.22 in transaction mode in front of the compose Postgres: prepared statements survive it (01/R7).
+      - run: make setup-api test-pooler
+
+  gate:
+    needs: [changes, governance, backend, frontend, evals, contract, security, images, pooler]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 -I - <<'EOF'
+          import json, os, sys
+          results = {job: info["result"] for job, info in json.loads(os.environ["RESULTS"]).items()}
+          bad = {job: r for job, r in results.items() if r not in ("success", "skipped") or (job == "changes" and r != "success")}
+          print("gate:", ", ".join(f"{job}={r}" for job, r in sorted(results.items())))
+          sys.exit(f"gate: failed or cancelled: {bad}" if bad else 0)
+          EOF

@@ -1,0 +1,32 @@
+# The build context for every image is the repository root. Secrets, personal files, caches and tests never enter an
+# image (12/N10, 07/O1): the image content test (tests/image/) fails if any of them does.
+**/.env
+**/.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/.dev-keys
+.claude/settings.local.json
+.claude/state
+.git
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+**/.hypothesis
+**/node_modules
+**/.next
+**/dist
+**/test-results
+**/playwright-report
+**/.uploads
+apps/api/tests
+apps/web/tests
+tests
+docs
+ops
+**/.DS_Store

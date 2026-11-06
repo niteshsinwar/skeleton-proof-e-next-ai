@@ -1,0 +1,101 @@
+# Nightly (11 §4): what is too slow, too costly or too time-dependent for every pull request. Each job runs the same
+# `make` targets a person runs (10/L2). Scheduled runs use the default branch's latest commit, in UTC; the minute is
+# off the hour because GitHub delays schedules at the start of each hour. Actions are pinned to full commit SHAs from
+# releases at least 7 days old (13/V5, V4); the token is read-only.
+name: nightly
+
+on:
+  schedule:
+    - cron: "23 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  # Notes about tools' behaviour re-verified within 21 days (10/H17), and every relative link in the docs resolves.
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: make reference-freshness link-check
+
+  # A fresh audit: advisories published since the last change can hit dependencies nobody touched (07/O21).
+  dependencies:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      - run: make tools deps
+
+  # Certificates, keys and model retirement dates, well before they lapse.
+  expiry:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      - run: make expiry-check
+
+  # Real-model evals cost money, so they run only when the repository opts in (variable NIGHTLY_LIVE_EVALS = true)
+  # AND the provider key is set. Every case runs 3 times and the run is recorded (06/E4, E7); the database is thrown
+  # away with the runner, so its eval rows and the per-case report are kept as an artifact.
+  evals:
+    if: vars.NIGHTLY_LIVE_EVALS == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      EVAL_LIVE: "1"
+      APP_DATABASE_URL: postgresql+psycopg://app_owner:local-only-not-a-secret@127.0.0.1:5432/app
+    steps:
+      # Secrets can't be tested in `if:`, so a step reads the key's presence; opting in without a key is a warning.
+      - id: key
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then echo "live=true" >> "$GITHUB_OUTPUT"
+          else echo "::warning::NIGHTLY_LIVE_EVALS is on but the ANTHROPIC_API_KEY secret is not set: no live eval ran"
+          echo "live=false" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.key.outputs.live == 'true'
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        if: steps.key.outputs.live == 'true'
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      # The local stack's Postgres (compose.yaml) holds the recorded runs; migrations from the code under test.
+      - if: steps.key.outputs.live == 'true'
+        run: cp .env.example .env && make db-up setup-api migrate
+      - if: steps.key.outputs.live == 'true'
+        run: make eval ARGS="--runs 3 --junitxml=../../eval-report.xml"
+      - if: always() && steps.key.outputs.live == 'true'
+        run: docker compose exec -T postgres pg_dump -U app_owner -d app --schema eval --data-only > eval-runs.sql
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && steps.key.outputs.live == 'true'
+        with:
+          name: eval-runs-${{ github.run_id }}
+          path: |
+            eval-report.xml
+            eval-runs.sql
+          retention-days: 90
+          if-no-files-found: error

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Dependency updates as a routine (13/V6), after the same 7-day cooldown as uv and pnpm (13/V4).",
+    "Security fixes bypass minimumReleaseAge by Renovate's design: that is the urgent path (docs: key-concepts/minimum-release-age).",
+    "Base images and actions are pinned by digest and SHA (13/V3, V5); majors arrive one at a time, never grouped.",
+    "Not managed here: ops/tools.toml (each binary carries a sha256 that a human verifies; update by hand)."
+  ],
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "minimumReleaseAge": "7 days",
+  "internalChecksFilter": "strict",
+  "prCreation": "not-pending",
+  "internalChecksAsSuccess": true,
+  "dependencyDashboard": true,
+  "pinDigests": true,
+  "labels": ["dependencies"],
+  "vulnerabilityAlerts": { "labels": ["security"] },
+  "packageRules": [
+    { "matchManagers": ["github-actions"], "groupName": "GitHub Actions" },
+    { "matchManagers": ["dockerfile", "docker-compose"], "groupName": "base images" },
+    { "matchManagers": ["pep621"], "matchUpdateTypes": ["minor", "patch", "digest"], "groupName": "Python dependencies" },
+    { "matchManagers": ["npm"], "matchUpdateTypes": ["minor", "patch", "digest"], "groupName": "web dependencies" },
+    { "matchUpdateTypes": ["major"], "groupName": null, "labels": ["dependencies", "major"] }
+  ]
+}

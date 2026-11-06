@@ -1,0 +1,53 @@
+{
+  "name": "skeleton-proof-e-next-ai-web",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.28.9",
+  "engines": {
+    "node": ">=26.12.1 <27"
+  },
+  "scripts": {
+    "dev": "next dev --port 3000",
+    "build": "next build && node -e \"require('node:fs').cpSync('.next/static', '.next/standalone/.next/static', { recursive: true })\"",
+    "start": "node .next/standalone/server.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "format": "prettier --write .",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "gen:api": "openapi-typescript ../../packages/contracts/openapi.json -o lib/api/generated/schema.d.ts && node -e \"require('node:fs').copyFileSync('../../packages/contracts/analytics-events.json', 'lib/api/generated/analytics-events.json')\""
+  },
+  "dependencies": {
+    "@base-ui/react": "1.9.0",
+    "@sentry/nextjs": "10.78.0",
+    "@tanstack/react-query": "5.105.0",
+    "next": "16.4.3",
+    "openapi-fetch": "0.17.0",
+    "openid-client": "6.8.8",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "web-vitals": "6.2.3",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
+    "@playwright/test": "1.64.1",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/dom": "10.4.2",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.8",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.4.3",
+    "jsdom": "29.1.1",
+    "openapi-typescript": "7.13.0",
+    "postcss": "8.5.32",
+    "prettier": "3.9.10",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vitest": "4.1.12"
+  }
+}

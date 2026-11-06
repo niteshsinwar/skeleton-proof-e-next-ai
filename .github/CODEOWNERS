@@ -1,0 +1,9 @@
+# Who must review what (11 §4; 13/V5: workflow changes need an owner's review). Rulesets require CODEOWNERS review.
+# OPEN (docs/open-questions.md Q4): replace @OWNER with real people or teams during /discover.
+# One line per area; the last matching line wins.
+*                       @OWNER
+/.github/               @OWNER
+/.claude/               @OWNER
+/apps/api/src/*/persistence/migrations/  @OWNER
+/ai/                    @OWNER
+/ops/                   @OWNER

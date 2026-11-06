@@ -1,0 +1,8 @@
+{
+  "$comment": "Product analytics (03/F49): every journey event the app may record, and the only values each property may take. A value is a list of allowed strings or \"number\"; there is no free text, so no personal data can be sent. The web app's copy (lib/api/generated/analytics-events.json) is generated from this file by `pnpm gen:api`. The two events below are the EXAMPLE work-item slice's: replace them with your journey's.",
+  "version": 1,
+  "events": {
+    "work_item.created": {},
+    "work_item.decided": { "outcome": ["approved", "rejected"] }
+  }
+}

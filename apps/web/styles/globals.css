@@ -1,0 +1,44 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* Tailwind utilities read the tokens; components never write literal values (03/F11). */
+@theme inline {
+  --color-canvas: var(--color-canvas);
+  --color-surface: var(--color-surface);
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-line: var(--color-line);
+  --color-accent: var(--color-accent);
+  --color-accent-ink: var(--color-accent-ink);
+  --color-ok: var(--color-ok);
+  --color-caution: var(--color-caution);
+  --color-bad: var(--color-bad);
+  --color-focus: var(--color-focus);
+  --radius-ui: var(--radius);
+  --shadow-ui: var(--shadow);
+}
+
+html {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--text-base);
+  line-height: var(--leading-body);
+}
+
+/* Motion only for state change, and never when the reader asks for less (03/F15). */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.measure {
+  max-width: var(--measure);
+}

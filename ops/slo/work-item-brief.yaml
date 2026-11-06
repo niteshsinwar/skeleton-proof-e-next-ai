@@ -1,0 +1,27 @@
+# The work-item brief: an approver asks the AI for a brief on a work item (the example AI slice). An AI journey has a
+# quality SLO beside availability and latency, and its alert is separate: "AI quality degraded" is not "system down"
+# (07/O13, O15). Loaded strictly by scripts/slo.py.
+journey: work-item-brief
+title: Work item brief (AI)
+starter: true
+window_days: 30
+routes:
+  - POST /work-items/{item_id}/brief
+objectives:
+  availability:
+    target: 99.9
+    owner: "@OWNER"
+    runbook: ops/runbooks/incident.md#1-triage
+  # A model call is slow next to a database read: the starter is 10 s at p95, to be replaced by the measured value.
+  latency:
+    target: 95
+    threshold_ms: 10000
+    owner: "@OWNER"
+    runbook: ops/runbooks/incident.md#1-triage
+  # The share of judged answers that pass: sampled online grading or the nightly eval emit one judgement per answer.
+  # Below about 93.1% the 1 h page could never fire (14.4 x the budget would exceed 1), so the loader refuses it.
+  quality:
+    target: 95
+    step: work_item_brief
+    owner: "@OWNER"
+    runbook: ops/runbooks/incident.md#ai-incidents

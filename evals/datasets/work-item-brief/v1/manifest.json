@@ -1,0 +1,9 @@
+{
+  "cases_sha256": "917c9bf6a225175fb8097fa2ed85c56752e07465aaae5cd93e1f7b462bb9b423",
+  "dataset": "work-item-brief",
+  "generator": "evals/generators/work_item_brief.py",
+  "released": "2026-11-05",
+  "step": "work_item_brief",
+  "synthetic": true,
+  "version": 1
+}

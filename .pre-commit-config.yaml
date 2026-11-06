@@ -1,0 +1,24 @@
+# Git hooks, run by prek (or pre-commit) after `make setup` (13/SK9). Local hooks only: the scanners are the pinned,
+# checksum-verified binaries from `make tools` (ops/tools.toml), the same ones CI runs (13/SK8).
+repos:
+  - repo: local
+    hooks:
+      - id: granularity-guard
+        name: commit granularity guard (10/H13)
+        entry: python3 scripts/commit_guard.py
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
+      - id: conventional-commit
+        name: Conventional Commit message (11 §4)
+        entry: python3 scripts/commit_msg_check.py
+        language: system
+        stages: [commit-msg]
+      - id: gitleaks
+        name: no secret in the staged changes (05/SG12)
+        entry: bash -c 'test -x .tools/bin/gitleaks || { echo "gitleaks is not installed: run make tools"; exit 1; }; .tools/bin/gitleaks git --pre-commit --staged --redact --no-banner --config .gitleaks.toml'
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]

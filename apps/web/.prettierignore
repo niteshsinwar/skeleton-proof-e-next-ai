@@ -1,0 +1,10 @@
+.next
+node_modules
+lib/api/generated
+test-results
+playwright-report
+pnpm-lock.yaml
+next-env.d.ts
+.dev-keys
+.e2e-state
+dist

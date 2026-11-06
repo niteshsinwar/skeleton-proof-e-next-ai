@@ -1,0 +1,13 @@
+# The throwaway registry the drills push to (scripts/drills.py), so local images are named by registry digest
+# exactly as in production (07/O1). Bound to this machine only; removed with its data when a drill ends.
+# Pinned by digest, at least 7 days old when pinned (13/V3, V4); Renovate moves it.
+services:
+  registry:
+    image: registry:3.1.1@sha256:325b4b29b041e82803abeb703e201655e4e23ab83264ec1a7c9ddb0a5b14a6e0
+    ports:
+      # A port chosen by the drill: Docker Desktop's daemon can't push to an ephemeral published port.
+      - "127.0.0.1:${REGISTRY_PORT:?scripts/drills.py picks a free port}:5000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/v2/"]
+      interval: 2s
+      retries: 15

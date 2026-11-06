@@ -1,0 +1,136 @@
+# The Docker host (Compose) deploy target (plans/b5 D1): the BUILT images, by digest, never a working tree (07/O1).
+# Driven only by scripts/deploy.py (`make deploy`), which sets the image digests, APP_ENV and the release labels, and
+# reads every other value from the host's env file (never in git; see compose-host.env.example):
+#   docker compose -f ops/deploy/compose-host/compose.yaml -p skeleton-proof-e-next-ai-<env> --env-file <host env file> ...
+# Each service gets only the variables it needs, named here, so the API never sees the owner's credential and the
+# migration never sees the app's. TLS and the public hostname sit in front of the published ports (the project's).
+name: skeleton-proof-e-next-ai
+
+x-api-image: &api-image
+  image: ${API_IMAGE:?scripts/deploy.py sets the API image digest}
+  pull_policy: missing
+  restart: unless-stopped
+
+x-api-env: &api-env
+  APP_ENV: ${APP_ENV:?scripts/deploy.py sets APP_ENV}
+  APP_DATABASE_URL: ${APP_DATABASE_URL:?the app's login role, never the owner (02/Z10)}
+  APP_AUTH_JWKS_FILE: /run/app-config/jwks.json
+  APP_AUTH_ISSUER: ${APP_AUTH_ISSUER:?the https issuer the API trusts}
+  APP_AUTH_AUDIENCE: ${APP_AUTH_AUDIENCE:?the API's token audience}
+  APP_RATE_LIMIT_STORE: postgres
+  APP_UPLOAD_DIR: /data/uploads
+  # Empty means the product AI is off and the product still works (01/R5).
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+  APP_MCP_SECRETS_KEY: ${APP_MCP_SECRETS_KEY:?32 random bytes in base64 that seal outside servers' secrets}
+  APP_MCP_RESOURCE_URL: ${APP_MCP_RESOURCE_URL:?this server's https URL}
+  APP_MCP_ALLOWED_HOSTS: ${APP_MCP_ALLOWED_HOSTS:?a JSON list of the public host names}
+  APP_WEBHOOK_SECRETS: ${APP_WEBHOOK_SECRETS:-{}}
+
+# The host folder holding the public JWKS; read-only, never in an image (12/N10).
+x-config-mount: &config-mount ${APP_CONFIG_DIR:?a host folder with jwks.json}:/run/app-config:ro
+
+services:
+  # One-off, before the new version takes traffic (07/O2): `docker compose run --rm migrate [downgrade --to REV]`.
+  migrate:
+    <<: *api-image
+    restart: "no"
+    profiles: [ops]
+    command: [migrate]
+    environment:
+      APP_ENV: ${APP_ENV:?scripts/deploy.py sets APP_ENV}
+      APP_MIGRATION_DATABASE_URL: ${APP_MIGRATION_DATABASE_URL:?the schema owner, used only by migrations}
+    depends_on:
+      postgres: { condition: service_healthy, required: false }
+
+  api:
+    <<: *api-image
+    command: [api]
+    environment: *api-env
+    volumes:
+      - *config-mount
+      - uploads:/data/uploads
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${API_PORT:-8000}:8000"
+    # /ready: the database answers as the app role and its migration is this image's head (02/A12, 07/O2), so
+    # `up --wait` returns only once the new version can really serve.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/ready', timeout=3)"]
+      interval: 5s
+      timeout: 4s
+      retries: 6
+      start_period: 20s
+    # Longer than the server's own graceful shutdown (GRACEFUL_SHUTDOWN_SECONDS, 20 s), so requests in flight finish.
+    stop_grace_period: 30s
+    labels: &release-labels
+      skeleton-proof-e-next-ai.release.sha: ${RELEASE_SHA:-unknown}
+      skeleton-proof-e-next-ai.release.migration: ${RELEASE_MIGRATION:-unknown}
+      skeleton-proof-e-next-ai.release.api-image: ${API_IMAGE}
+      skeleton-proof-e-next-ai.release.web-image: ${WEB_IMAGE:-none}
+      skeleton-proof-e-next-ai.release.previous-api-image: ${PREVIOUS_API_IMAGE:-none}
+      skeleton-proof-e-next-ai.release.previous-web-image: ${PREVIOUS_WEB_IMAGE:-none}
+      skeleton-proof-e-next-ai.release.by: ${RELEASE_BY:-unknown}
+      skeleton-proof-e-next-ai.release.at: ${RELEASE_AT:-unknown}
+    depends_on:
+      postgres: { condition: service_healthy, required: false }
+
+  worker:
+    <<: *api-image
+    command: [worker]
+    environment: *api-env
+    volumes:
+      - *config-mount
+      - uploads:/data/uploads
+    # SIGTERM drains the worker: the job in hand finishes, nothing new is claimed (07/O6). A job still running at the
+    # deadline is reaped after its visibility timeout and runs again under its idempotency key, so nothing is lost.
+    stop_grace_period: 2m
+    labels: *release-labels
+    depends_on:
+      api: { condition: service_healthy }
+
+  web:
+    image: ${WEB_IMAGE:?scripts/deploy.py sets the web image digest}
+    pull_policy: missing
+    restart: unless-stopped
+    environment:
+      API_URL: http://api:8000
+      OIDC_ISSUER: ${OIDC_ISSUER:?the identity provider the app signs in through}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?}
+      SESSION_SECRET: ${SESSION_SECRET:?at least 32 characters}
+      APP_BASE_URL: ${APP_BASE_URL:?the app's https origin}
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/',{redirect:'manual'}).then(r=>process.exit(r.status<500?0:1),()=>process.exit(1))"]
+      interval: 5s
+      timeout: 4s
+      retries: 6
+      start_period: 20s
+    stop_grace_period: 30s
+    labels: *release-labels
+    depends_on:
+      api: { condition: service_healthy }
+
+  # Postgres on the same host, only when the env file says DEPLOY_DATABASE=bundled; otherwise a managed database is
+  # reached through the URLs above. The same image as the local stack (compose.yaml); its data lives in a named volume.
+  postgres:
+    image: pgvector/pgvector:0.8.6-pg18-trixie@sha256:78bf48b801e792f99e3ac62b5036fd3876e9be48afda16c1e331af1c75ceb2ff
+    profiles: [bundled-db]
+    restart: unless-stopped
+    environment:
+      # scripts/deploy.py takes these from APP_MIGRATION_DATABASE_URL, so the owner's password is written once.
+      POSTGRES_USER: ${BUNDLED_DB_USER:-app_owner}
+      POSTGRES_PASSWORD: ${BUNDLED_DB_PASSWORD:-}
+      POSTGRES_DB: ${BUNDLED_DB_NAME:-app}
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      retries: 10
+    stop_grace_period: 1m
+
+volumes:
+  pgdata:
+  uploads:
