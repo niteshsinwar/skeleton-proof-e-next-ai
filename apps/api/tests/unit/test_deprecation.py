@@ -47,7 +47,7 @@ def test_before_the_sunset_a_retiring_route_answers_and_announces_it(path: str) 
     r = client(datetime(2026, 6, 30, 23, 59, tzinfo=UTC)).get(path)
     assert r.status_code == 200
     assert r.headers["Deprecation"] == "@1767225600"  # 2026-01-01T00:00:00Z as an RFC 9651 Date
-    assert r.headers["Sunset"] == "Wed, 01 Jul 2026 00:00:00 GMT"  # an HTTP-date, always GMT
+    assert r.headers["Sunset"] == "Thu, 02 Jul 2026 00:00:00 GMT"  # PLANTED FAULT: the gate must go red
     assert r.headers["Link"] == f'<{LINK}>; rel="deprecation"'
 
 
